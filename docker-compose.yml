@@ -1,0 +1,51 @@
+
+
+
+version: '3.8'
+
+services:
+  # ZooKeeper service (required by Kafka in some configurations)
+  zookeeper:
+    image: bitnami/zookeeper:3.8
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+      - ZOOKEEPER_ENABLE_AUDIT_LOGGER=true
+    ports:
+      - "2181:2181"
+    volumes:
+      - ./zookeeper_conf:/opt/bitnami/zookeeper/conf:rw
+
+  # Kafka service using Bitnami image
+  kafka:
+    image: bitnami/kafka:3.4.0
+    depends_on:
+      - zookeeper
+    environment:
+      - ALLOW_PLAINTEXT_LISTENER=yes
+      - KAFKA_BROKER_ID=1
+      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
+      - KAFKA_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092
+      - KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER
+    ports:
+      - "9092:9092"
+
+  # Redis service for the feature store
+  redis:
+    image: redis:6.2
+    ports:
+      - "6379:6379"
+
+  # ML Service running the FastAPI application
+  ml_service:
+    build: .
+    depends_on:
+      - kafka
+      - redis
+    ports:
+      - "8000:8000"
+    environment:
+      # Use the service name (kafka) when running inside Docker
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - REDIS_HOST=redis
+      - APP_MODE=both
