@@ -1,4 +1,4 @@
-# FeatureFlux Enhanced
+# FeatureFlux 
 
 **FeatureFlux Enhanced** is a fully modular, scalable ML serving platform that integrates:
 - **Neural Networks & Deep Learning** (PyTorch, TensorFlow)
