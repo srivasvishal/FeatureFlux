@@ -1,28 +1,22 @@
-import torch
-import torch.nn as nn
-import pandas as pd
-import numpy as np
+"""
+model.py for timeseries_model
 
-class LSTMForecast(nn.Module):
-    def __init__(self, input_size=1, hidden_size=32):
-        super(LSTMForecast, self).__init__()
-        self.lstm = nn.LSTM(input_size, hidden_size, batch_first=True)
-        self.linear = nn.Linear(hidden_size, 1)
+A dummy time series prediction model.
+For illustration, it computes the average of the input series as the forecast.
+In a real implementation, you might use ARIMA, LSTM, or another method.
+"""
 
-    def forward(self, x):
-        output, _ = self.lstm(x)
-        return self.linear(output[:, -1, :])
-
-model = LSTMForecast()
-model.load_state_dict(torch.load('lstm_model.pth'))
-model.eval()
-
-def predict_timeseries(csv_path):
-    data = pd.read_csv(csv_path)
-    inputs = torch.tensor(data.values, dtype=torch.float32).unsqueeze(0)
-    with torch.no_grad():
-        prediction = model(inputs).item()
-    return prediction
-
-if __name__ == "__main__":
-    print(predict_timeseries('sample_input.csv'))
+def predict(input_data: dict, features: dict = None):
+    """
+    Expects input_data to have key 'series' which is a list of numeric values.
+    Returns the average as the forecast.
+    """
+    series = input_data.get("series", [])
+    if not series:
+        return {"error": "No series data provided"}
+    try:
+        # Compute the average as a dummy forecast.
+        forecast = sum(series) / len(series)
+    except Exception as e:
+        return {"error": f"Error computing forecast: {e}"}
+    return {"forecast": forecast}

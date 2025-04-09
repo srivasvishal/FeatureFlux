@@ -1,47 +1,55 @@
+"""
+cli.py
+
+A command-line interface (CLI) for interacting with the FeatureFlux system.
+It uses argparse to define commands for sending events and testing predictions.
+"""
+
 import argparse
 import json
+from ingestion.producer import produce_events
 from models import model_loader
-import redis
-from kafka import KafkaProducer
+from feature_store.store import RedisFeatureStore
 
-def predict_cli(model_name, input_data, entity_id=None):
-    redis_client = redis.Redis(host="localhost", port=6379)
-    features = {}
-    if entity_id:
-        raw = redis_client.hgetall(f"features:{entity_id}")
-        features = {k.decode('utf-8'): float(v.decode('utf-8')) for k, v in raw.items()} if raw else {}
-    result = model_loader.predict(model_name, input_data, features)
-    print("Prediction result:", result)
-
-def send_event_cli(model_name, input_data, entity_id=None):
-    producer = KafkaProducer(bootstrap_servers=["localhost:9092"],
-                            value_serializer=lambda v: json.dumps(v).encode('utf-8'))
-    event = {"model_name": model_name, "data": input_data}
-    if entity_id:
-        event["entity_id"] = entity_id
-    producer.send("events", event)
-    producer.flush()
-    print("Event sent to Kafka.")
+def send_event(model, input_data, entity):
+    """
+    Sends an event using the producer logic.
+    Here we simulate the sending by directly calling the consumer logic.
+    (In a full system, this would publish to Kafka.)
+    """
+    # For demonstration, update the feature store and perform prediction.
+    store = RedisFeatureStore()
+    store.set_features(f"features:{entity}", input_data)
+    print(f"Event sent for {entity} with data: {input_data}")
+    result = model_loader.predict(model, input_data)
+    print(f"Prediction result: {result}")
 
 def main():
-    parser = argparse.ArgumentParser(prog="featureflux-cli")
-    subparsers = parser.add_subparsers(dest="command")
+    parser = argparse.ArgumentParser(description="FeatureFlux CLI")
+    subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
-    pred_parser = subparsers.add_parser("predict", help="Run a prediction")
-    pred_parser.add_argument("--model", required=True, help="Model name")
-    pred_parser.add_argument("--input", required=True, help="Input data (JSON string)")
-    pred_parser.add_argument("--entity", help="Entity ID for feature lookup")
+    # Command to send an event
+    send_parser = subparsers.add_parser("send-event", help="Send a test event")
+    send_parser.add_argument("--model", required=True, help="Model name (e.g., tabular_model)")
+    send_parser.add_argument("--input", required=True, help="Input data as JSON string")
+    send_parser.add_argument("--entity", required=True, help="Entity ID for the event")
 
-    evt_parser = subparsers.add_parser("send-event", help="Send event to Kafka")
-    evt_parser.add_argument("--model", required=True, help="Model name")
-    evt_parser.add_argument("--input", required=True, help="Input data (JSON string)")
-    evt_parser.add_argument("--entity", help="Entity ID")
+    # Command to start the producer (continuous event production)
+    prod_parser = subparsers.add_parser("produce-events", help="Start continuous event production")
 
     args = parser.parse_args()
-    if args.command == "predict":
-        predict_cli(args.model, json.loads(args.input), args.entity)
-    elif args.command == "send-event":
-        send_event_cli(args.model, json.loads(args.input), args.entity)
+
+    if args.command == "send-event":
+        try:
+            input_data = json.loads(args.input)
+        except json.JSONDecodeError as e:
+            print(f"Invalid JSON input: {e}")
+            return
+        send_event(args.model, input_data, args.entity)
+    elif args.command == "produce-events":
+        produce_events()
+    else:
+        parser.print_help()
 
 if __name__ == "__main__":
     main()
